@@ -3,7 +3,8 @@
 let config = {
     type: Phaser.AUTO,
     width: 800,
-    height: 600,
+    height: 500,
+    backgroundColor: '#E0E0E0',
     scene: [ Play, Postcard]
 }
 

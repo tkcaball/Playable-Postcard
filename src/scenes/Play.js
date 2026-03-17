@@ -12,6 +12,7 @@ class Play extends Phaser.Scene {
         this.load.audio("cheer", "./assets/Cheering.mp3")
         this.load.audio("music", "./assets/Music.mp3")
         this.load.audio("lightswitch", "./assets/Lightswitch.mp3")
+        this.load.audio("memoryGameSound", "./assets/MemoryGame.mp3")
     }
 
     create() {
@@ -19,14 +20,49 @@ class Play extends Phaser.Scene {
         let graphics = this.add.graphics()
 
         //Stage
-        graphics.fillStyle(0x606060, 1)
-        graphics.fillRect(200, 240, 400, 180)
+        graphics.fillStyle(0x353434, 1)
+
+        let stagePoints = [
+            new Phaser.Geom.Point(180,260),
+            new Phaser.Geom.Point(620,260),
+            new Phaser.Geom.Point(700,420),
+            new Phaser.Geom.Point(100,420)
+        ]
+
+        graphics.fillPoints(stagePoints, true)
+
+        //Outer glow
+        graphics.lineStyle(22, 0x990000, 0.15)
+        graphics.strokePoints(stagePoints, true)
+        //Medium glow
+        graphics.lineStyle(16, 0x990000, 0.35)
+        graphics.strokePoints(stagePoints, true)
+        //White light
+        graphics.lineStyle(3, 0xffffff, 1)
+        graphics.strokePoints(stagePoints, true)
+
+
+        graphics.fillPoints([
+            new Phaser.Geom.Point(180, 260),
+            new Phaser.Geom.Point(620, 260),
+            new Phaser.Geom.Point(700, 420),
+            new Phaser.Geom.Point(100, 420)
+        ], true)
+
+        graphics.lineStyle(2, 0x404040, 1)
+
+        graphics.strokePoints([
+            new Phaser.Geom.Point(180,260),
+            new Phaser.Geom.Point(620,260),
+            new Phaser.Geom.Point(700,420),
+            new Phaser.Geom.Point(100,420)
+        ], true)
 
         //Stage Screen
-        this.stageTarget = this.add.rectangle(410, 115, 380, 150, 0x4444ff)
+        this.stageTarget = this.add.rectangle(410, 115, 450, 180, 0x990000)
 
         //Stage screen starts at full screen title screen
-        this.stageScreen = this.add.rectangle(400, 250, 800, 500, 0x4444ff)
+        this.stageScreen = this.add.rectangle(400, 250, 800, 500, 0x990000)
         this.stageScreen.setOrigin(0.5)
         this.stageScreen.setDepth(100)
 
@@ -39,6 +75,12 @@ class Play extends Phaser.Scene {
             font: "24px Helvetica",
             color: "#ffffff"
         }).setOrigin(0.5).setDepth(101)
+
+        this.creditsText = this.add.text(400, 300, "Press C for Credits", {
+            font: "18px Helvetica",
+            color: "#ffffff"
+        }).setOrigin(0.5).setDepth(101)
+
         this.startScreenActive = true
 
         this.stageScreen.setInteractive()
@@ -48,11 +90,12 @@ class Play extends Phaser.Scene {
 
             this.titleText.destroy()
             this.startText.destroy()
+            this.creditsText.destroy()
 
             this.tweens.add({
                 targets: this.stageScreen,
-                scaleX: 380/800,
-                scaleY: 150/500,
+                scaleX: 450/800,
+                scaleY: 180/500,
                 x: 410,
                 y: 115,
                 duration: 1200,
@@ -68,6 +111,8 @@ class Play extends Phaser.Scene {
         this.artistSound = this.sound.add("artist")
         this.cheerSound = this.sound.add("cheer")
         this.musicSound = this.sound.add("music")
+        this.memoryGameSound = this.sound.add("memoryGameSound")
+        
 
         //Stage Light
         this.stageLight = this.add.triangle(485, 150, 0, 0, 80, 500, -80, 500, 0xff0000)
@@ -95,12 +140,22 @@ class Play extends Phaser.Scene {
             this.artistSound.play()
         })
 
+        this.tweens.add({
+            targets: this.jhope,
+            y: 278, //bounce up slightly
+            yoyo: true, //go back down
+            repeat: -1, //repeat forever
+            duration: 400,
+            ease: "Sine.easeInOut"
+        })
+
         this.crowd = this.add.image(400, 160, "crowd")
         this.crowd.setScale(0.70)
         this.crowd.setInteractive({ pixelPerfect: true, useHandCursor: true })
         this.crowd.on("pointerdown", () => {
             this.cheerSound.play()
             this.blinkLightsticks(0xffffff)
+            this.cameras.main.shake(500, 0.01)
         })
 
         //Crowd Lightsticks
@@ -126,6 +181,14 @@ class Play extends Phaser.Scene {
         //Postcard scene
         this.keyP = this.input.keyboard.addKey('P')
 
+        //Levels
+        this.key1 = this.input.keyboard.addKey('ONE')
+        this.key2 = this.input.keyboard.addKey('TWO')
+        this.key3 = this.input.keyboard.addKey('THREE')
+
+        //Credits
+        this.keyC = this.input.keyboard.addKey('C')
+
         //Memory game
         this.keyM = this.input.keyboard.addKey('M')
         this.keyR = this.input.keyboard.addKey('R')
@@ -140,8 +203,10 @@ class Play extends Phaser.Scene {
         //Variables
         this.pattern = []
         this.playerPattern = []
+        this.patternLength = 5
         this.memoryActive = false
         this.gameStarted = false
+        this.choosingLevel = false
 
         //Replay game limit 3
         this.replayCount = 0
@@ -158,8 +223,8 @@ class Play extends Phaser.Scene {
         }
 
         //Instructions
-        this.add.text(260, 60,
-            "Click to interact\nPress M to start memory game\nRepeat with R O Y G B W V\nPress A to replay pattern",
+        this.add.text(220, 60,
+            "Click to interact\nPress M to start memory game\nUse R O Y G B W V for colors\nRed, Orange, Yellow, Green, Blue, White, Violet\nPress A to replay pattern",
             { font: "18px Helvetica", color: "#ffffff", align: "center" }
         )
 
@@ -169,9 +234,18 @@ class Play extends Phaser.Scene {
             color:"#ffffff"
         }).setOrigin(0.5)
 
+        //Left botto, cover
+        this.add.rectangle(20, 470, 50, 180, 0x000000).setDepth(-1)
+        //Right bottom cover
+        this.add.rectangle(800, 470, 100, 260, 0x000000).setDepth(-1)
+
     }
 
     update() {
+        if(Phaser.Input.Keyboard.JustDown(this.keyC)){
+            this.scene.start("creditsScene")
+        }
+
         if(this.startScreenActive){
             return
         }
@@ -180,42 +254,73 @@ class Play extends Phaser.Scene {
             this.scene.start("postcardScene")
         }
 
-        if(Phaser.Input.Keyboard.JustDown(this.keyM) && !this.gameStarted) {
-            this.startMemoryGame()
-            this.gameStarted = true
+        if (Phaser.Input.Keyboard.JustDown(this.keyM) && !this.memoryActive) {
+            this.choosingLevel = true
+            this.messageText.setText("Choose Level: 1 Easy | 2 Medium | 3 Hard")
         }
 
-        if(Phaser.Input.Keyboard.JustDown(this.keyA)){
-            this.replayPattern()
+        //Difficulty selection
+        if (this.choosingLevel) {
+            if (Phaser.Input.Keyboard.JustDown(this.key1)) {
+                this.patternLength = 3
+                this.messageText.setText("Easy Mode Selected")
+                this.startGame()
+            }
+            if (Phaser.Input.Keyboard.JustDown(this.key2)) {
+                this.patternLength = 5
+                this.messageText.setText("Medium Mode Selected")
+                this.startGame()
+            }
+            if (Phaser.Input.Keyboard.JustDown(this.key3)) {
+                this.patternLength = 7
+                this.messageText.setText("Hard Mode Selected")
+                this.startGame()
+            }
         }
+            if(this.memoryActive && Phaser.Input.Keyboard.JustDown(this.keyA)){
+                this.replayPattern()
+            }
 
         //Player input
         if(this.memoryActive){
-
             if(Phaser.Input.Keyboard.JustDown(this.keyR)){ 
+                this.memoryGameSound.play()
                 this.checkPattern("R")
             }
             if(Phaser.Input.Keyboard.JustDown(this.keyO)){
+                this.memoryGameSound.play()
                 this.checkPattern("O")
             }
             if(Phaser.Input.Keyboard.JustDown(this.keyY)){
+                this.memoryGameSound.play()
                 this.checkPattern("Y")
             }
             if(Phaser.Input.Keyboard.JustDown(this.keyG)){
+                this.memoryGameSound.play()
                 this.checkPattern("G")
             }
             if(Phaser.Input.Keyboard.JustDown(this.keyB)){
+                this.memoryGameSound.play()
                 this.checkPattern("B")
             }
             if(Phaser.Input.Keyboard.JustDown(this.keyW)){
+                this.memoryGameSound.play()
                 this.checkPattern("W")
             }
             if(Phaser.Input.Keyboard.JustDown(this.keyV)){
+                this.memoryGameSound.play()
                 this.checkPattern("V")
             }
 
         }
     }
+
+    startGame() {
+    this.choosingLevel = false
+    this.gameStarted = true
+    this.startMemoryGame()
+    this.messageText.setText("Watch the pattern")
+}
 
     blinkLightsticks(color){
         this.lightsticks.forEach(stick=>{
@@ -236,7 +341,7 @@ class Play extends Phaser.Scene {
     generatePattern(){
         let keys = Object.keys(this.colors)
         this.pattern = []
-        for(let i=0; i<5; i++){
+        for(let i=0; i<this.patternLength; i++){
             let random = Phaser.Utils.Array.GetRandom(keys)
             this.pattern.push(random)
         }
@@ -255,8 +360,9 @@ class Play extends Phaser.Scene {
     }
 
     playPattern() {
-
         let i = 0
+
+        this.memoryActive = false
 
         this.time.addEvent({
             delay: 700,
@@ -276,8 +382,11 @@ class Play extends Phaser.Scene {
                 i++
 
                 if(i == this.pattern.length){
-                    this.memoryActive = true
-                    this.messageText.setText("Repeat the pattern")
+                    this.time.delayedCall(350, () => {
+                        this.stageLight.setFillStyle(0x000000)
+                        this.memoryActive = true
+                        this.messageText.setText("Repeat the pattern")
+                    })
                 }
             }
         })
@@ -302,9 +411,11 @@ class Play extends Phaser.Scene {
 
         let index = this.playerPattern.length - 1
         if(this.playerPattern[index] != this.pattern[index]) {
-            this.messageText.setText("Wrong pattern")
+            this.messageText.setText("Wrong pattern! Press M to try again")
             this.playerPattern =[]
+            this.memoryActive = false
             this.gameStarted = false
+            this.choosingLevel = false
             return
         }
 
